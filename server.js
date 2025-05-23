@@ -58,6 +58,17 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('joinGame', (playerName) => {
+    players.push(playerName);
+    io.emit('playerList', players); // Enviar lista actualizada a todos los clientes
+    console.log(`${playerName} se unió a la sala.`);
+  });
+
+  socket.on('leaveGame', (playerName) => {
+    players = players.filter((p) => p !== playerName);
+    io.emit('playerList', players); // Enviar lista actualizada a todos los clientes
+    console.log(`${playerName} ha salido de la sala.`);
+  });
   socket.on('disconnect', () => {
     players = players.filter((p) => p !== socket.id);
     io.emit('playerList', players);
