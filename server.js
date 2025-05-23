@@ -49,6 +49,15 @@ io.on('connection', (socket) => {
   });
 });
 
+// Método para desconectar a todos los jugadores
+socket.on('disconnectAll', () => {
+  players = []; // Vaciar la lista de jugadores
+  io.emit('playerList', players); // Notificar a todos que la lista está vacía
+  console.log(
+    'Todos los jugadores han sido desconectados por el administrador.'
+  );
+});
+
 // Iniciar servidor
 server.listen(PORT, () => {
   console.log(`Servidor escuchando en http://localhost:${PORT}`);
