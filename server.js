@@ -7,58 +7,78 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: '*', // Permite conexiones desde cualquier origen (ajusta según necesidad)
+    origin: '*', // Permite conexiones desde cualquier origen
   },
 });
 
 const PORT = process.env.PORT || 3000;
 const roomCode = 'D13LZW'; // Código de la sala
 let players = []; // Lista de jugadores
+let winners = []; // Lista de ganadores
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Ruta de prueba
-app.get('/', (req, res) => {
-  res.send('Servidor de Sopa de Letras activo');
+// ✅ Endpoint para crear la sala
+app.post('/createRoom', (req, res) => {
+  const { adminName } = req.body;
+  console.log(`Sala creada por ${adminName}, código: ${roomCode}`);
+  res.json({ message: 'Sala creada', roomCode });
 });
 
-// Manejo de conexiones con Socket.io
+// ✅ Endpoint para unirse a la sala
+app.post('/joinRoom', (req, res) => {
+  const { playerName } = req.body;
+  players.push(playerName);
+  io.emit('playerList', players); // Actualizar lista de jugadores en frontend
+  console.log(`${playerName} se unió a la sala.`);
+  res.json({ message: 'Jugador añadido', players });
+});
+
+// ✅ Evento para iniciar el juego
 io.on('connection', (socket) => {
   console.log(`Jugador conectado: ${socket.id}`);
 
-  // Unir jugador a la sala
-  socket.on('joinGame', (playerName) => {
-    players.push({ id: socket.id, name: playerName });
-    console.log(`${playerName} se unió a la sala ${roomCode}`);
-    io.emit('playerList', players); // Enviar lista actualizada a todos
-  });
-
-  // Iniciar el juego (solo el administrador)
   socket.on('startGame', () => {
     console.log('¡El juego ha comenzado!');
-    io.emit('gameStart'); // Enviar evento a todos los jugadores
+    io.emit('gameStart'); // Notificar a todos los jugadores
   });
 
-  // Manejar desconexión de jugadores
+  socket.on('submitWinner', (playerName) => {
+    if (!winners.includes(playerName)) {
+      winners.push(playerName);
+      console.log(
+        `${playerName} ha ganado! Total ganadores: ${winners.length}`
+      );
+
+      if (winners.length === 3) {
+        io.emit('gameFinished', { winners });
+        console.log('¡Tenemos 3 ganadores!');
+      }
+    }
+  });
+
   socket.on('disconnect', () => {
-    players = players.filter((p) => p.id !== socket.id);
-    io.emit('playerList', players); // Actualizar la lista para todos
+    players = players.filter((p) => p !== socket.id);
+    io.emit('playerList', players);
     console.log(`Jugador desconectado: ${socket.id}`);
   });
+
+  socket.on('disconnectAll', () => {
+    players = [];
+    winners = [];
+    io.emit('playerList', players);
+    io.emit('gameReset');
+    console.log('Todos los jugadores han sido desconectados.');
+  });
 });
 
-// Método para desconectar a todos los jugadores
-socket.on('disconnectAll', () => {
-  players = []; // Vaciar la lista de jugadores
-  io.emit('playerList', players); // Notificar a todos que la lista está vacía
-  console.log(
-    'Todos los jugadores han sido desconectados por el administrador.'
-  );
+// ✅ Obtener estado del juego
+app.get('/gameStatus', (req, res) => {
+  res.json({ players, winners });
 });
 
-// Iniciar servidor
+// 🔥 Iniciar el servidor
 server.listen(PORT, () => {
   console.log(`Servidor escuchando en http://localhost:${PORT}`);
 });
